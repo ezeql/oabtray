@@ -1,2 +1,0 @@
-# oabtray
-oab traybar
