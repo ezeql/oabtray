@@ -26,11 +26,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev
 
-    - name: Install macOS dependencies
-      if: runner.os == 'macOS'
-      run: |
-        brew install gtk+3 webkitgtk
-
     - name: Build
       run: go build -v ./...
 
