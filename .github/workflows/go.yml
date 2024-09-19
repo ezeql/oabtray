@@ -1,10 +1,9 @@
-name: Go Multi-Platform Build
+name: Go Multi-Platform Build and Release
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -27,7 +26,71 @@ jobs:
         sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libwebkit2gtk-4.0-dev
 
     - name: Build
-      run: go build -v ./...
+      run: |
+        GOOS=${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }} \
+        GOARCH=amd64 \
+        go build -v -o bitcoin-tracker-${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./...
 
-    - name: Test
-      run: go test -v ./...
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: bitcoin-tracker-${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+        path: bitcoin-tracker-${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./bitcoin-tracker-${{ matrix.os }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+        asset_name: bitcoin-tracker-${{ matrix.os }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset (Linux)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./bitcoin-tracker-linux-amd64
+        asset_name: bitcoin-tracker-linux-amd64
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset (macOS)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./bitcoin-tracker-darwin-amd64
+        asset_name: bitcoin-tracker-darwin-amd64
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release Asset (Windows)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./bitcoin-tracker-windows-amd64.exe
+        asset_name: bitcoin-tracker-windows-amd64.exe
+        asset_content_type: application/octet-stream
