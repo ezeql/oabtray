@@ -27,15 +27,15 @@ jobs:
 
     - name: Build
       run: |
-        GOOS=${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }} \
+        GOOS=${{ runner.os == 'Windows' && 'windows' || runner.os == 'macOS' && 'darwin' || 'linux' }} \
         GOARCH=amd64 \
-        go build -v -o bitcoin-tracker-${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./...
+        go build -v -o bitcoin-tracker-${{ runner.os == 'Windows' && 'windows' || runner.os == 'macOS' && 'darwin' || 'linux' }}-amd64${{ runner.os == 'Windows' && '.exe' || '' }} ./...
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
-        name: bitcoin-tracker-${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-        path: bitcoin-tracker-${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+        name: bitcoin-tracker-${{ runner.os == 'Windows' && 'windows' || runner.os == 'macOS' && 'darwin' || 'linux' }}-amd64${{ runner.os == 'Windows' && '.exe' || '' }}
+        path: bitcoin-tracker-${{ runner.os == 'Windows' && 'windows' || runner.os == 'macOS' && 'darwin' || 'linux' }}-amd64${{ runner.os == 'Windows' && '.exe' || '' }}
 
   release:
     needs: build
@@ -56,41 +56,11 @@ jobs:
         prerelease: false
 
     - name: Upload Release Assets
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          bitcoin-tracker-windows-amd64.exe
+          bitcoin-tracker-darwin-amd64
+          bitcoin-tracker-linux-amd64
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bitcoin-tracker-${{ matrix.os }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-        asset_name: bitcoin-tracker-${{ matrix.os }}-amd64${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-        asset_content_type: application/octet-stream
-
-    - name: Upload Release Asset (Linux)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bitcoin-tracker-linux-amd64
-        asset_name: bitcoin-tracker-linux-amd64
-        asset_content_type: application/octet-stream
-
-    - name: Upload Release Asset (macOS)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bitcoin-tracker-darwin-amd64
-        asset_name: bitcoin-tracker-darwin-amd64
-        asset_content_type: application/octet-stream
-
-    - name: Upload Release Asset (Windows)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bitcoin-tracker-windows-amd64.exe
-        asset_name: bitcoin-tracker-windows-amd64.exe
-        asset_content_type: application/octet-stream
