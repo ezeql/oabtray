@@ -16,7 +16,6 @@ import (
 	"github.com/getlantern/systray"
 )
 
-const ALABA_FACTOR = 0.5
 const INITIAL_DISPLAY_DURATION = 5 * time.Second
 const SCREEN_WIDTH = 20
 const ANIMATION_SPEED = 100 * time.Millisecond
@@ -34,6 +33,7 @@ type PersistentData struct {
 	LastPrice         float64
 	LastChangePercent float64
 	LastUpdateTime    time.Time
+	AlabaFactor       float64
 }
 
 var isFirstUpdate = true
@@ -41,12 +41,17 @@ var mu sync.Mutex
 var lastPrice float64
 var lastChangePercent float64
 var lastUpdateTime time.Time
+var alabaFactor float64 = 0.5
 
 func main() {
 	data := loadPersistentData()
 	lastPrice = data.LastPrice
 	lastChangePercent = data.LastChangePercent
 	lastUpdateTime = data.LastUpdateTime
+	alabaFactor = data.AlabaFactor
+	if alabaFactor == 0 {
+		alabaFactor = 0.5
+	}
 
 	go priceUpdater()
 	systray.Run(onReady, onExit)
@@ -57,6 +62,22 @@ func onReady() {
 	systray.SetTooltip("Bitcoin Price Tracker")
 	mBitcoinPrice := systray.AddMenuItem("Loading...", "Bitcoin price")
 	mBitcoinPrice.Disable()
+
+	systray.AddSeparator()
+	mAlabaFactor := systray.AddMenuItem("ALABA_FACTOR", "Set ALABA_FACTOR")
+	alabaFactorOptions := make([]*systray.MenuItem, 6)
+	alabaFactorValues := []float64{0.5, 1, 1.5, 2, 2.5, 3}
+
+	for i, value := range alabaFactorValues {
+		alabaFactorOptions[i] = mAlabaFactor.AddSubMenuItem(fmt.Sprintf("%.1f", value), fmt.Sprintf("Set ALABA_FACTOR to %.1f", value))
+		go func(item *systray.MenuItem, value float64) {
+			for range item.ClickedCh {
+				setAlabaFactor(value)
+			}
+		}(alabaFactorOptions[i], value)
+	}
+
+	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Exit the application")
 
 	go func() {
@@ -65,7 +86,7 @@ func onReady() {
 	}()
 
 	if lastPrice > 0 {
-		updateTray(lastPrice, lastChangePercent)
+		updateTrayQuiet(lastPrice, lastChangePercent)
 		log.Printf("Loaded price from disk: $%.2f (%+.2f%%)", lastPrice, lastChangePercent)
 	}
 }
@@ -74,11 +95,18 @@ func onExit() {
 	savePersistentData()
 }
 
+func setAlabaFactor(value float64) {
+	mu.Lock()
+	alabaFactor = value
+	mu.Unlock()
+	log.Printf("ALABA_FACTOR set to %.1f", value)
+	updateTrayQuiet(lastPrice, lastChangePercent)
+	savePersistentData()
+}
+
 func priceUpdater() {
-	// Esperar un poco para asegurarse de que la interfaz de usuario esté lista
 	time.Sleep(1 * time.Second)
 
-	// Si los datos son antiguos o no existen, actualizar inmediatamente
 	if time.Since(lastUpdateTime) > UPDATE_INTERVAL || lastUpdateTime.IsZero() {
 		fetchAndUpdatePrice()
 	}
@@ -146,41 +174,50 @@ func updateTrayWithInitialDisplay(price, changePercent float64) {
 }
 
 func updateTray(price, changePercent float64) {
-	priceStr := formatPriceString(price, changePercent)
-	systray.SetTitle(priceStr)
-	systray.SetTooltip(priceStr)
-
-	if math.Abs(changePercent-lastChangePercent) >= ALABA_FACTOR {
+	updateTrayQuiet(price, changePercent)
+	
+	if math.Abs(changePercent) >= alabaFactor {
 		var animationText string
-		if changePercent >= lastChangePercent+ALABA_FACTOR {
+		if changePercent >= alabaFactor {
 			animationText = strings.Repeat("ALABADOOOOOOOO ", 5)
-		} else if changePercent <= lastChangePercent-ALABA_FACTOR {
+		} else if changePercent <= -alabaFactor {
 			animationText = strings.Repeat("PUTA MADRE ", 5)
 		}
-
+		
 		if animationText != "" {
 			go animateTrainSign(animationText)
 		}
 	}
 }
 
+func updateTrayQuiet(price, changePercent float64) {
+	priceStr := formatPriceString(price, changePercent)
+	systray.SetTitle(priceStr)
+	systray.SetTooltip(priceStr)
+}
+
 func formatPriceString(price, changePercent float64) string {
 	var emoji string
-	if changePercent >= ALABA_FACTOR {
+	if changePercent >= alabaFactor {
 		emoji = "🟢"
-	} else if changePercent < -ALABA_FACTOR {
+	} else if changePercent < -alabaFactor {
 		emoji = "🔴"
 	} else {
 		emoji = "⚪"
 	}
-
-	rockets := getRocketEmojis(changePercent)
-	return fmt.Sprintf("₿ %s $%.2f (%+.2f%%) %s", emoji, price, changePercent, rockets)
+	
+	emoticons := getEmoticons(changePercent)
+	return fmt.Sprintf("₿ %s $%.2f (%+.2f%%) %s", emoji, price, changePercent, emoticons)
 }
 
-func getRocketEmojis(changePercent float64) string {
-	rocketCount := int(math.Abs(changePercent)) % int(ALABA_FACTOR*10)
-	return strings.Repeat("🚀", rocketCount)
+func getEmoticons(changePercent float64) string {
+	absChangePercent := math.Abs(changePercent)
+	count := int(math.Floor(absChangePercent / alabaFactor))
+	if changePercent >= 0 {
+		return strings.Repeat("🚀", count)
+	} else {
+		return strings.Repeat("🧂", count)
+	}
 }
 
 func displayError(err error) {
@@ -199,7 +236,6 @@ func animateTrainSign(text string) {
 		time.Sleep(ANIMATION_SPEED)
 	}
 
-	// Restaurar el precio después de la animación
 	systray.SetTitle(formatPriceString(lastPrice, lastChangePercent))
 }
 
@@ -208,6 +244,7 @@ func savePersistentData() {
 		LastPrice:         lastPrice,
 		LastChangePercent: lastChangePercent,
 		LastUpdateTime:    lastUpdateTime,
+		AlabaFactor:       alabaFactor,
 	}
 
 	file, err := os.Create(getDataFilePath())
