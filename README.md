@@ -12,6 +12,8 @@ OABTray is a simple and fun Bitcoin price tracker that sits in your system tray.
 
 ## Installation
 
+### Building from source
+
 1. Ensure you have Go installed on your system.
 2. Clone this repository:
 
@@ -36,6 +38,10 @@ OABTray is a simple and fun Bitcoin price tracker that sits in your system tray.
    ```bash
    ./oabtray
    ```
+
+### Brew
+
+Brew formula is on /Users/ezeql/dev/homebrew-personal/Formula
 
 ## Usage
 
