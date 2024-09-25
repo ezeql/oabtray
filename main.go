@@ -21,6 +21,9 @@ const SCREEN_WIDTH = 20
 const ANIMATION_SPEED = 100 * time.Millisecond
 const UPDATE_INTERVAL = 5 * time.Minute
 const DATA_FILE = "bitcoin_tracker_data.gob"
+const BULL_ANIMATION_DURATION = 3 * time.Second
+const BULL_ANIMATION_SPEED = 100 * time.Millisecond
+const LOCK_FILE = "bitcoin_tracker.lock"
 
 type CoinGeckoResponse struct {
 	Bitcoin struct {
@@ -42,8 +45,18 @@ var lastPrice float64
 var lastChangePercent float64
 var lastUpdateTime time.Time
 var alabaFactor float64 = 0.5
+var alabaFactorMenuItems []*systray.MenuItem
+var isAnimating bool = false
+var animationMutex sync.Mutex
+var lockFile *os.File
 
 func main() {
+	if !acquireLock() {
+		fmt.Println("Another instance of the application is already running.")
+		return
+	}
+	defer releaseLock()
+
 	data := loadPersistentData()
 	lastPrice = data.LastPrice
 	lastChangePercent = data.LastChangePercent
@@ -57,10 +70,35 @@ func main() {
 	systray.Run(onReady, onExit)
 }
 
+func acquireLock() bool {
+	var err error
+	lockFile, err = os.OpenFile(getLockFilePath(), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func releaseLock() {
+	if lockFile != nil {
+		lockFile.Close()
+		os.Remove(getLockFilePath())
+	}
+}
+
+func getLockFilePath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Error getting home directory: %v", err)
+		return LOCK_FILE
+	}
+	return filepath.Join(homeDir, LOCK_FILE)
+}
+
 func onReady() {
 	systray.SetTitle("₿")
 	systray.SetTooltip("Bitcoin Price Tracker")
-	mBitcoinPrice := systray.AddMenuItem("Loading...", "Bitcoin price")
+	mBitcoinPrice := systray.AddMenuItem("OAB", "Bitcoin price")
 	mBitcoinPrice.Disable()
 
 	systray.AddSeparator()
@@ -69,13 +107,27 @@ func onReady() {
 	alabaFactorValues := []float64{0.5, 1, 1.5, 2, 2.5, 3}
 
 	for i, value := range alabaFactorValues {
-		alabaFactorOptions[i] = mAlabaFactor.AddSubMenuItem(fmt.Sprintf("%.1f", value), fmt.Sprintf("Set ALABA_FACTOR to %.1f", value))
+		menuText := fmt.Sprintf("%.1f", value)
+		if value == alabaFactor {
+			menuText += " ✓"
+		}
+		alabaFactorOptions[i] = mAlabaFactor.AddSubMenuItem(menuText, fmt.Sprintf("Set ALABA_FACTOR to %.1f", value))
 		go func(item *systray.MenuItem, value float64) {
 			for range item.ClickedCh {
 				setAlabaFactor(value)
 			}
 		}(alabaFactorOptions[i], value)
 	}
+	alabaFactorMenuItems = alabaFactorOptions
+
+	systray.AddSeparator()
+
+	mSimulateAlaba := systray.AddMenuItem("Simular ALABADOOOOOOOO", "Activar animación ALABADOOOOOOOO")
+	go func() {
+		for range mSimulateAlaba.ClickedCh {
+			simulateAlabadoooooooo()
+		}
+	}()
 
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Exit the application")
@@ -93,6 +145,7 @@ func onReady() {
 
 func onExit() {
 	savePersistentData()
+	releaseLock()
 }
 
 func setAlabaFactor(value float64) {
@@ -100,8 +153,20 @@ func setAlabaFactor(value float64) {
 	alabaFactor = value
 	mu.Unlock()
 	log.Printf("ALABA_FACTOR set to %.1f", value)
+	updateAlabaFactorMenu()
 	updateTrayQuiet(lastPrice, lastChangePercent)
 	savePersistentData()
+}
+
+func updateAlabaFactorMenu() {
+	for i, item := range alabaFactorMenuItems {
+		value := []float64{0.5, 1, 1.5, 2, 2.5, 3}[i]
+		menuText := fmt.Sprintf("%.1f", value)
+		if value == alabaFactor {
+			menuText += " ✓"
+		}
+		item.SetTitle(menuText)
+	}
 }
 
 func priceUpdater() {
@@ -185,7 +250,7 @@ func updateTray(price, changePercent float64) {
 		}
 		
 		if animationText != "" {
-			go animateTrainSign(animationText)
+			go runAnimation(animationText)
 		}
 	}
 }
@@ -198,9 +263,9 @@ func updateTrayQuiet(price, changePercent float64) {
 
 func formatPriceString(price, changePercent float64) string {
 	var emoji string
-	if changePercent >= alabaFactor {
+	if changePercent > 0 {
 		emoji = "🟢"
-	} else if changePercent < -alabaFactor {
+	} else if changePercent < 0 {
 		emoji = "🔴"
 	} else {
 		emoji = "⚪"
@@ -226,17 +291,58 @@ func displayError(err error) {
 	systray.SetTooltip(errorMsg)
 }
 
+func runAnimation(text string) {
+	animationMutex.Lock()
+	if isAnimating {
+		animationMutex.Unlock()
+		return
+	}
+	isAnimating = true
+	animationMutex.Unlock()
+
+	animateRunningBull()
+	animateTrainSign(text)
+
+	animationMutex.Lock()
+	isAnimating = false
+	animationMutex.Unlock()
+}
+
+func animateRunningBull() {
+	bull := "🐂"
+	screenWidth := SCREEN_WIDTH
+	duration := BULL_ANIMATION_DURATION
+	steps := int(duration / BULL_ANIMATION_SPEED)
+
+	for i := 0; i <= steps; i++ {
+		position := screenWidth - 1 - (i % screenWidth)
+		displayText := strings.Repeat(" ", position) + bull
+		if len(displayText) < screenWidth {
+			displayText += strings.Repeat(" ", screenWidth-len(displayText))
+		}
+		systray.SetTitle(displayText[:screenWidth])
+		time.Sleep(BULL_ANIMATION_SPEED)
+	}
+}
+
 func animateTrainSign(text string) {
 	textLength := len(text)
+	repeats := 3 // Number of times to repeat the scrolling text
 
-	for i := 0; i < textLength; i++ {
-		displayText := text[i:] + text[:i]
-		displayText = displayText[:SCREEN_WIDTH]
-		systray.SetTitle(displayText)
-		time.Sleep(ANIMATION_SPEED)
+	for j := 0; j < repeats; j++ {
+		for i := 0; i < textLength; i++ {
+			displayText := text[i:] + text[:i]
+			displayText = displayText[:SCREEN_WIDTH]
+			systray.SetTitle(displayText)
+			time.Sleep(ANIMATION_SPEED)
+		}
 	}
 
 	systray.SetTitle(formatPriceString(lastPrice, lastChangePercent))
+}
+
+func simulateAlabadoooooooo() {
+	go runAnimation(strings.Repeat("ALABADOOOOOOOO ", 5))
 }
 
 func savePersistentData() {
