@@ -14,16 +14,19 @@ import (
 	"time"
 
 	"github.com/getlantern/systray"
+	"github.com/gofrs/flock"
 )
 
-const INITIAL_DISPLAY_DURATION = 5 * time.Second
-const SCREEN_WIDTH = 20
-const ANIMATION_SPEED = 100 * time.Millisecond
-const UPDATE_INTERVAL = 5 * time.Minute
-const DATA_FILE = "bitcoin_tracker_data.gob"
-const BULL_ANIMATION_DURATION = 3 * time.Second
-const BULL_ANIMATION_SPEED = 100 * time.Millisecond
-const LOCK_FILE = "bitcoin_tracker.lock"
+const (
+	INITIAL_DISPLAY_DURATION  = 5 * time.Second
+	SCREEN_WIDTH              = 20
+	ANIMATION_SPEED           = 100 * time.Millisecond
+	UPDATE_INTERVAL           = 5 * time.Minute
+	DATA_FILE                 = "bitcoin_tracker_data.gob"
+	BULL_ANIMATION_DURATION   = 3 * time.Second
+	BULL_ANIMATION_SPEED      = 100 * time.Millisecond
+	LOCK_FILE                 = "bitcoin_tracker.lock"
+)
 
 type CoinGeckoResponse struct {
 	Bitcoin struct {
@@ -39,23 +42,31 @@ type PersistentData struct {
 	AlabaFactor       float64
 }
 
-var isFirstUpdate = true
-var mu sync.Mutex
-var lastPrice float64
-var lastChangePercent float64
-var lastUpdateTime time.Time
-var alabaFactor float64 = 0.5
-var alabaFactorMenuItems []*systray.MenuItem
-var isAnimating bool = false
-var animationMutex sync.Mutex
-var lockFile *os.File
+var (
+	isFirstUpdate         = true
+	mu                    sync.Mutex
+	lastPrice             float64
+	lastChangePercent     float64
+	lastUpdateTime        time.Time
+	alabaFactor           float64 = 0.5
+	alabaFactorMenuItems  []*systray.MenuItem
+	isAnimating           bool = false
+	animationMutex        sync.Mutex
+	fileLock              *flock.Flock
+)
 
 func main() {
-	if !acquireLock() {
+	fileLock = flock.New(getLockFilePath())
+	locked, err := fileLock.TryLock()
+	if err != nil {
+		log.Printf("Error acquiring lock: %v", err)
+		return
+	}
+	if !locked {
 		fmt.Println("Another instance of the application is already running.")
 		return
 	}
-	defer releaseLock()
+	defer fileLock.Unlock()
 
 	data := loadPersistentData()
 	lastPrice = data.LastPrice
@@ -68,31 +79,6 @@ func main() {
 
 	go priceUpdater()
 	systray.Run(onReady, onExit)
-}
-
-func acquireLock() bool {
-	var err error
-	lockFile, err = os.OpenFile(getLockFilePath(), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666)
-	if err != nil {
-		return false
-	}
-	return true
-}
-
-func releaseLock() {
-	if lockFile != nil {
-		lockFile.Close()
-		os.Remove(getLockFilePath())
-	}
-}
-
-func getLockFilePath() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Printf("Error getting home directory: %v", err)
-		return LOCK_FILE
-	}
-	return filepath.Join(homeDir, LOCK_FILE)
 }
 
 func onReady() {
@@ -122,14 +108,6 @@ func onReady() {
 
 	systray.AddSeparator()
 
-	mSimulateAlaba := systray.AddMenuItem("Simular ALABADOOOOOOOO", "Activar animación ALABADOOOOOOOO")
-	go func() {
-		for range mSimulateAlaba.ClickedCh {
-			simulateAlabadoooooooo()
-		}
-	}()
-
-	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Exit the application")
 
 	go func() {
@@ -145,7 +123,7 @@ func onReady() {
 
 func onExit() {
 	savePersistentData()
-	releaseLock()
+	fileLock.Unlock()
 }
 
 func setAlabaFactor(value float64) {
@@ -341,10 +319,6 @@ func animateTrainSign(text string) {
 	systray.SetTitle(formatPriceString(lastPrice, lastChangePercent))
 }
 
-func simulateAlabadoooooooo() {
-	go runAnimation(strings.Repeat("ALABADOOOOOOOO ", 5))
-}
-
 func savePersistentData() {
 	data := PersistentData{
 		LastPrice:         lastPrice,
@@ -393,4 +367,13 @@ func getDataFilePath() string {
 		return DATA_FILE
 	}
 	return filepath.Join(homeDir, DATA_FILE)
+}
+
+func getLockFilePath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Error getting home directory: %v", err)
+		return LOCK_FILE
+	}
+	return filepath.Join(homeDir, LOCK_FILE)
 }
