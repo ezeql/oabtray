@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,11 +22,17 @@ const (
 	INITIAL_DISPLAY_DURATION  = 5 * time.Second
 	SCREEN_WIDTH              = 20
 	ANIMATION_SPEED           = 100 * time.Millisecond
-	UPDATE_INTERVAL           = 5 * time.Minute
+	UPDATE_INTERVAL           = 30 * time.Second
 	DATA_FILE                 = "bitcoin_tracker_data.gob"
 	BULL_ANIMATION_DURATION   = 3 * time.Second
 	BULL_ANIMATION_SPEED      = 100 * time.Millisecond
 	LOCK_FILE                 = "bitcoin_tracker.lock"
+
+)
+
+var(
+	VERSION                 = "dev"
+	BUILD_TIME              = "unknown"
 )
 
 type CoinGeckoResponse struct {
@@ -40,6 +47,12 @@ type PersistentData struct {
 	LastChangePercent float64
 	LastUpdateTime    time.Time
 	AlabaFactor       float64
+}
+
+type BinanceResponse struct {
+	LastPrice      string  `json:"lastPrice"`
+	PriceChange    string  `json:"priceChange"`
+	PriceChangePercent string `json:"priceChangePercent"`
 }
 
 var (
@@ -88,6 +101,10 @@ func onReady() {
 	mBitcoinPrice.Disable()
 
 	systray.AddSeparator()
+	versionInfo := fmt.Sprintf("Version: %s (Built: %s)", VERSION, BUILD_TIME)
+	mVersion := systray.AddMenuItem(versionInfo, "Version information")
+	mVersion.Disable()
+
 	mAlabaFactor := systray.AddMenuItem("ALABA_FACTOR", "Set ALABA_FACTOR")
 	alabaFactorOptions := make([]*systray.MenuItem, 6)
 	alabaFactorValues := []float64{0.5, 1, 1.5, 2, 2.5, 3}
@@ -188,7 +205,7 @@ func fetchAndUpdatePrice() {
 }
 
 func fetchPriceFromCoinGecko() (float64, float64, error) {
-	resp, err := http.Get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true")
+	resp, err := http.Get("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT")
 	if err != nil {
 		return 0, 0, fmt.Errorf("network error: %v", err)
 	}
@@ -198,12 +215,22 @@ func fetchPriceFromCoinGecko() (float64, float64, error) {
 		return 0, 0, fmt.Errorf("API error: status code %d", resp.StatusCode)
 	}
 
-	var data CoinGeckoResponse
+	var data BinanceResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return 0, 0, fmt.Errorf("JSON decode error: %v", err)
 	}
 
-	return data.Bitcoin.USD, data.Bitcoin.USD24HChange, nil
+	price, err := strconv.ParseFloat(data.LastPrice, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("price parse error: %v", err)
+	}
+
+	changePercent, err := strconv.ParseFloat(data.PriceChangePercent, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("change percent parse error: %v", err)
+	}
+
+	return price, changePercent, nil
 }
 
 func updateTrayWithInitialDisplay(price, changePercent float64) {

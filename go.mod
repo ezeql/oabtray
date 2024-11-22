@@ -2,7 +2,10 @@ module github.com/ezeql/oabtray
 
 go 1.23.1
 
-require github.com/getlantern/systray v1.2.2
+require (
+	github.com/getlantern/systray v1.2.2
+	github.com/gofrs/flock v0.12.1
+)
 
 require (
 	github.com/getlantern/context v0.0.0-20220418194847-3d5e7a086201 // indirect
@@ -14,7 +17,6 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
-	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
 	go.opentelemetry.io/otel v1.30.0 // indirect
 	go.opentelemetry.io/otel/metric v1.30.0 // indirect
