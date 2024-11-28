@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,15 +25,14 @@ const (
 	ANIMATION_SPEED           = 100 * time.Millisecond
 	UPDATE_INTERVAL           = 30 * time.Second
 	DATA_FILE                 = "bitcoin_tracker_data.gob"
-	BULL_ANIMATION_DURATION   = 3 * time.Second
+	BULL_ANIMATION_DURATION   = time.Second
 	BULL_ANIMATION_SPEED      = 100 * time.Millisecond
 	LOCK_FILE                 = "bitcoin_tracker.lock"
-
+	ALABA_FACTOR              = 2.5
 )
 
 var(
-	VERSION                 = "dev"
-	BUILD_TIME              = "unknown"
+	VERSION = "dev"
 )
 
 type CoinGeckoResponse struct {
@@ -46,7 +46,6 @@ type PersistentData struct {
 	LastPrice         float64
 	LastChangePercent float64
 	LastUpdateTime    time.Time
-	AlabaFactor       float64
 }
 
 type BinanceResponse struct {
@@ -61,11 +60,11 @@ var (
 	lastPrice             float64
 	lastChangePercent     float64
 	lastUpdateTime        time.Time
-	alabaFactor           float64 = 0.5
-	alabaFactorMenuItems  []*systray.MenuItem
 	isAnimating           bool = false
 	animationMutex        sync.Mutex
 	fileLock              *flock.Flock
+	// lastAlabadoTime       time.Time
+	toTheMoonMode         bool = false
 )
 
 func main() {
@@ -79,16 +78,16 @@ func main() {
 		fmt.Println("Another instance of the application is already running.")
 		return
 	}
-	defer fileLock.Unlock()
+	defer func() {
+		if err := fileLock.Unlock(); err != nil {
+			log.Printf("Error releasing lock: %v", err)
+		}
+	}()
 
 	data := loadPersistentData()
 	lastPrice = data.LastPrice
 	lastChangePercent = data.LastChangePercent
 	lastUpdateTime = data.LastUpdateTime
-	alabaFactor = data.AlabaFactor
-	if alabaFactor == 0 {
-		alabaFactor = 0.5
-	}
 
 	go priceUpdater()
 	systray.Run(onReady, onExit)
@@ -101,35 +100,36 @@ func onReady() {
 	mBitcoinPrice.Disable()
 
 	systray.AddSeparator()
-	versionInfo := fmt.Sprintf("Version: %s (Built: %s)", VERSION, BUILD_TIME)
-	mVersion := systray.AddMenuItem(versionInfo, "Version information")
-	mVersion.Disable()
-
-	mAlabaFactor := systray.AddMenuItem("ALABA_FACTOR", "Set ALABA_FACTOR")
-	alabaFactorOptions := make([]*systray.MenuItem, 6)
-	alabaFactorValues := []float64{0.5, 1, 1.5, 2, 2.5, 3}
-
-	for i, value := range alabaFactorValues {
-		menuText := fmt.Sprintf("%.1f", value)
-		if value == alabaFactor {
-			menuText += " ✓"
-		}
-		alabaFactorOptions[i] = mAlabaFactor.AddSubMenuItem(menuText, fmt.Sprintf("Set ALABA_FACTOR to %.1f", value))
-		go func(item *systray.MenuItem, value float64) {
-			for range item.ClickedCh {
-				setAlabaFactor(value)
-			}
-		}(alabaFactorOptions[i], value)
+	mMoonMode := systray.AddMenuItem("Set price in millions", "Toggle price in millions")
+	if toTheMoonMode {
+		mMoonMode.Check()
 	}
-	alabaFactorMenuItems = alabaFactorOptions
 
 	systray.AddSeparator()
+	mVersion := systray.AddMenuItem("Version: " + VERSION, "Version information")
+	mVersion.Disable()
 
+	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Exit the application")
 
 	go func() {
-		<-mQuit.ClickedCh
-		systray.Quit()
+		for {
+			select {
+			case <-mQuit.ClickedCh:
+				systray.Quit()
+			case <-mMoonMode.ClickedCh:
+				toTheMoonMode = !toTheMoonMode
+				if toTheMoonMode {
+					mMoonMode.Check()
+				} else {
+					mMoonMode.Uncheck()
+				}
+				// Update display with current price
+				if lastPrice > 0 {
+					updateTrayQuiet(lastPrice, lastChangePercent)
+				}
+			}
+		}
 	}()
 
 	if lastPrice > 0 {
@@ -140,28 +140,6 @@ func onReady() {
 
 func onExit() {
 	savePersistentData()
-	fileLock.Unlock()
-}
-
-func setAlabaFactor(value float64) {
-	mu.Lock()
-	alabaFactor = value
-	mu.Unlock()
-	log.Printf("ALABA_FACTOR set to %.1f", value)
-	updateAlabaFactorMenu()
-	updateTrayQuiet(lastPrice, lastChangePercent)
-	savePersistentData()
-}
-
-func updateAlabaFactorMenu() {
-	for i, item := range alabaFactorMenuItems {
-		value := []float64{0.5, 1, 1.5, 2, 2.5, 3}[i]
-		menuText := fmt.Sprintf("%.1f", value)
-		if value == alabaFactor {
-			menuText += " ✓"
-		}
-		item.SetTitle(menuText)
-	}
 }
 
 func priceUpdater() {
@@ -180,7 +158,7 @@ func priceUpdater() {
 }
 
 func fetchAndUpdatePrice() {
-	price, changePercent, err := fetchPriceFromCoinGecko()
+	price, changePercent, err := fetchPrice()
 	if err != nil {
 		log.Printf("Error fetching price: %v", err)
 		displayError(err)
@@ -204,7 +182,7 @@ func fetchAndUpdatePrice() {
 	savePersistentData()
 }
 
-func fetchPriceFromCoinGecko() (float64, float64, error) {
+func fetchPrice() (float64, float64, error) {
 	resp, err := http.Get("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT")
 	if err != nil {
 		return 0, 0, fmt.Errorf("network error: %v", err)
@@ -246,12 +224,12 @@ func updateTrayWithInitialDisplay(price, changePercent float64) {
 func updateTray(price, changePercent float64) {
 	updateTrayQuiet(price, changePercent)
 	
-	if math.Abs(changePercent) >= alabaFactor {
+	if math.Abs(changePercent) >= 5.0 {
 		var animationText string
-		if changePercent >= alabaFactor {
-			animationText = strings.Repeat("ALABADOOOOOOOO ", 5)
-		} else if changePercent <= -alabaFactor {
-			animationText = strings.Repeat("PUTA MADRE ", 5)
+		if changePercent >= 5.0 {
+			animationText = "ALABADO!!!"
+		} else if changePercent <= -5.0 {
+			animationText = "PUTA MADRE!"
 		}
 		
 		if animationText != "" {
@@ -276,13 +254,43 @@ func formatPriceString(price, changePercent float64) string {
 		emoji = "⚪"
 	}
 	
+	var priceStr string
+	if toTheMoonMode {
+		millions := price / 1000
+		priceStr = fmt.Sprintf("%.3fM", millions/1000)
+	} else {
+		// Format with thousands separator using string manipulation
+		priceStr = addThousandsSeparator(fmt.Sprintf("%.2f", price))
+	}
+	
 	emoticons := getEmoticons(changePercent)
-	return fmt.Sprintf("₿ %s $%.2f (%+.2f%%) %s", emoji, price, changePercent, emoticons)
+	return fmt.Sprintf("₿ %s $%s (%+.2f%%) %s", emoji, priceStr, changePercent, emoticons)
+}
+
+func addThousandsSeparator(s string) string {
+	// Split the string into integer and decimal parts
+	parts := strings.Split(s, ".")
+	intPart := parts[0]
+	
+	// Add commas to the integer part
+	var result []byte
+	for i := len(intPart) - 1; i >= 0; i-- {
+		if len(result) > 0 && (len(intPart)-i-1)%3 == 0 {
+			result = append([]byte{','}, result...)
+		}
+		result = append([]byte{intPart[i]}, result...)
+	}
+	
+	// Reconstruct the number with decimal part
+	if len(parts) > 1 {
+		return string(result) + "." + parts[1]
+	}
+	return string(result)
 }
 
 func getEmoticons(changePercent float64) string {
 	absChangePercent := math.Abs(changePercent)
-	count := int(math.Floor(absChangePercent / alabaFactor))
+	count := int(math.Floor(absChangePercent / ALABA_FACTOR))
 	if changePercent >= 0 {
 		return strings.Repeat("🚀", count)
 	} else {
@@ -291,9 +299,9 @@ func getEmoticons(changePercent float64) string {
 }
 
 func displayError(err error) {
-	errorMsg := fmt.Sprintf("₿ Error: %s", err.Error())
+	errorMsg := fmt.Sprintf("%-*s", SCREEN_WIDTH, "TECHNICAL DIFFICULTIES :)")
 	systray.SetTitle(errorMsg)
-	systray.SetTooltip(errorMsg)
+	systray.SetTooltip(err.Error())
 }
 
 func runAnimation(text string) {
@@ -305,53 +313,63 @@ func runAnimation(text string) {
 	isAnimating = true
 	animationMutex.Unlock()
 
-	animateRunningBull()
-	animateTrainSign(text)
+	// Show full text instantly
+	paddedText := fmt.Sprintf("%-*s", SCREEN_WIDTH, text)
+	systray.SetTitle(paddedText)
+	time.Sleep(1 * time.Second)
+
+	// Convert text to rune slice for character manipulation
+	chars := []rune(text)
+	positions := make([]int, len(chars))
+	for i := range positions {
+		positions[i] = i
+	}
+
+	// Randomly remove characters one by one
+	for len(positions) > 0 {
+		// Pick a random position to remove
+		randIndex := rand.Intn(len(positions))
+		removePos := positions[randIndex]
+		
+		// Remove the position from our slice
+		positions = append(positions[:randIndex], positions[randIndex+1:]...)
+		
+		// Create display text with character removed
+		displayChars := make([]rune, len(chars))
+		copy(displayChars, chars)
+		displayChars[removePos] = ' '
+		
+		// Update remaining characters
+		for _, pos := range positions {
+			displayChars[pos] = chars[pos]
+		}
+		
+		// Display the result
+		displayText := fmt.Sprintf("%-*s", SCREEN_WIDTH, string(displayChars))
+		systray.SetTitle(displayText)
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Return to price display
+	systray.SetTitle(formatPriceString(lastPrice, lastChangePercent))
 
 	animationMutex.Lock()
 	isAnimating = false
 	animationMutex.Unlock()
 }
 
-func animateRunningBull() {
-	bull := "🐂"
-	screenWidth := SCREEN_WIDTH
-	duration := BULL_ANIMATION_DURATION
-	steps := int(duration / BULL_ANIMATION_SPEED)
-
-	for i := 0; i <= steps; i++ {
-		position := screenWidth - 1 - (i % screenWidth)
-		displayText := strings.Repeat(" ", position) + bull
-		if len(displayText) < screenWidth {
-			displayText += strings.Repeat(" ", screenWidth-len(displayText))
-		}
-		systray.SetTitle(displayText[:screenWidth])
-		time.Sleep(BULL_ANIMATION_SPEED)
-	}
-}
-
-func animateTrainSign(text string) {
-	textLength := len(text)
-	repeats := 3 // Number of times to repeat the scrolling text
-
-	for j := 0; j < repeats; j++ {
-		for i := 0; i < textLength; i++ {
-			displayText := text[i:] + text[:i]
-			displayText = displayText[:SCREEN_WIDTH]
-			systray.SetTitle(displayText)
-			time.Sleep(ANIMATION_SPEED)
-		}
-	}
-
-	systray.SetTitle(formatPriceString(lastPrice, lastChangePercent))
-}
+// func max(a, b int) int {
+// 	if a > b {
+// 		return a
+// 	}
+// 	return b
+// }
 
 func savePersistentData() {
 	data := PersistentData{
 		LastPrice:         lastPrice,
 		LastChangePercent: lastChangePercent,
 		LastUpdateTime:    lastUpdateTime,
-		AlabaFactor:       alabaFactor,
 	}
 
 	file, err := os.Create(getDataFilePath())
