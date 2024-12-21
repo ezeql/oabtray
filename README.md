@@ -1,6 +1,6 @@
-[![Go Multi-Platform Build and Release](https://github.com/ezeql/oabtray/actions/workflows/go.yml/badge.svg)](https://github.com/ezeql/oabtray/actions/workflows/go.yml)
-
 # OABTray - Bitcoin Price Tracker 🚀🚀🚀🚀
+
+[![Go Multi-Platform Build and Release](https://github.com/ezeql/oabtray/actions/workflows/go.yml/badge.svg)](https://github.com/ezeql/oabtray/actions/workflows/go.yml)
 
 OABTray is a simple and fun Bitcoin price tracker that sits in your system tray. It provides real-time updates on Bitcoin's price and percentage change from Binance, with amusing animations for significant price movements.
 
@@ -22,32 +22,32 @@ OABTray is a simple and fun Bitcoin price tracker that sits in your system tray.
 
 ## Installation
 
-### Building from source
+### Building from Source
 
-1. Ensure you have Go 1.23.3 or later installed on your macOS system.
-2. Clone this repository:
+1. Ensure you have Go 1.23.3 or later installed on your macOS system
+1. Clone this repository:
 
-   ```bash
-   git clone https://github.com/ezeql/oabtray.git
-   ```
+```bash
+git clone https://github.com/ezeql/oabtray.git
+```
 
-3. Navigate to the project directory:
+1. Navigate to the project directory:
 
-   ```bash
-   cd oabtray
-   ```
+```bash
+cd oabtray
+```
 
-4. Build the application:
+1. Build the application:
 
-   ```bash
-   ./build.sh
-   ```
+```bash
+./build.sh
+```
 
-5. Run the executable:
+1. Run the executable:
 
-   ```bash
-   ./oabtray
-   ```
+```bash
+./oabtray
+```
 
 ### Brew
 
@@ -56,12 +56,14 @@ Brew formula is on /Users/ezeql/dev/homebrew-personal/Formula
 ## Usage
 
 Once running, OABTray will appear in your system tray with the Bitcoin symbol (₿). The tray icon will display:
+
 - Current Bitcoin price (with thousands separator)
 - 24-hour percentage change
 - Emoji indicator (🟢, 🔴, or ⚪)
 - Rocket 🚀 or salt 🧂 indicators based on price movement
 
-### Features:
+### Options
+
 - Click on the tray icon to see options
 - Toggle "Set price in millions" to switch between normal and millions display mode
 - View the current version
@@ -73,6 +75,7 @@ Once running, OABTray will appear in your system tray with the Bitcoin symbol (�
 ## Price Indicators
 
 The app shows price movement intensity with emojis:
+
 - Up movements: Rocket emojis 🚀 (more rockets = bigger movement)
 - Down movements: Salt emojis 🧂 (more salt = bigger drop)
 - Current trend: 🟢 (up), 🔴 (down), or ⚪ (no change)
@@ -80,6 +83,7 @@ The app shows price movement intensity with emojis:
 ## Dependencies
 
 This project uses the following external libraries:
+
 - github.com/getlantern/systray
 - github.com/gofrs/flock
 
