@@ -1,20 +1,30 @@
+[![Go Multi-Platform Build and Release](https://github.com/ezeql/oabtray/actions/workflows/go.yml/badge.svg)](https://github.com/ezeql/oabtray/actions/workflows/go.yml)
+
 # OABTray - Bitcoin Price Tracker 🚀🚀🚀🚀
 
-OABTray is a simple and fun Bitcoin price tracker that sits in your system tray. It provides real-time updates on Bitcoin's price and percentage change, with amusing animations for significant price movements.
+OABTray is a simple and fun Bitcoin price tracker that sits in your system tray. It provides real-time updates on Bitcoin's price and percentage change from Binance, with amusing animations for significant price movements.
 
 ## Features
 
-- Real-time Bitcoin price updates from CoinGecko API
-- Customizable ALABA_FACTOR to set thresholds for price change reactions
-- Fun animations for significant price movements
+- Real-time Bitcoin price updates from Binance API
+- Price display in USD with optional millions mode
+- Dynamic emoji indicators: 🟢 (up), 🔴 (down), ⚪ (no change)
+- Rocket 🚀 and salt 🧂 indicators based on price movements
+- Fun animations for significant price changes (±5%)
 - Persistent data storage between sessions
 - Easy-to-use system tray interface
+- 30-second price update interval
+
+## System Requirements
+
+- macOS (currently macOS-only)
+- Go 1.23.3 or later (for building from source)
 
 ## Installation
 
 ### Building from source
 
-1. Ensure you have Go installed on your system.
+1. Ensure you have Go 1.23.3 or later installed on your macOS system.
 2. Clone this repository:
 
    ```bash
@@ -30,7 +40,7 @@ OABTray is a simple and fun Bitcoin price tracker that sits in your system tray.
 4. Build the application:
 
    ```bash
-   go build
+   ./build.sh
    ```
 
 5. Run the executable:
@@ -45,24 +55,33 @@ Brew formula is on /Users/ezeql/dev/homebrew-personal/Formula
 
 ## Usage
 
-Once running, OABTray will appear in your system tray with the Bitcoin symbol (₿). The tray icon will display the current Bitcoin price and 24-hour percentage change.
+Once running, OABTray will appear in your system tray with the Bitcoin symbol (₿). The tray icon will display:
+- Current Bitcoin price (with thousands separator)
+- 24-hour percentage change
+- Emoji indicator (🟢, 🔴, or ⚪)
+- Rocket 🚀 or salt 🧂 indicators based on price movement
 
-- Click on the tray icon to see more options.
-- You can adjust the ALABA_FACTOR, which determines the threshold for special animations.
-- The app updates the price every 5 minutes.
+### Features:
+- Click on the tray icon to see options
+- Toggle "Set price in millions" to switch between normal and millions display mode
+- View the current version
+- Price updates every 30 seconds
+- Special animations trigger when price change exceeds ±5%:
+  - "ALABADO!!!" for +5% or more
+  - "PUTA MADRE!" for -5% or less
 
-## Configuration
+## Price Indicators
 
-The ALABA_FACTOR can be set to one of the following values: 0.5, 1, 1.5, 2, 2.5, or 3. This factor determines how sensitive the app is to price changes:
-
-- When the price change percentage exceeds the positive ALABA_FACTOR, you'll see a "ALABADOOOOOOOO" animation.
-- When it falls below the negative ALABA_FACTOR, you'll see a "PUTA MADRE" animation.
+The app shows price movement intensity with emojis:
+- Up movements: Rocket emojis 🚀 (more rockets = bigger movement)
+- Down movements: Salt emojis 🧂 (more salt = bigger drop)
+- Current trend: 🟢 (up), 🔴 (down), or ⚪ (no change)
 
 ## Dependencies
 
 This project uses the following external libraries:
-
 - github.com/getlantern/systray
+- github.com/gofrs/flock
 
 ## Contributing
 
