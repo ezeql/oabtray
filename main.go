@@ -35,12 +35,6 @@ var(
 	VERSION = "dev"
 )
 
-type CoinGeckoResponse struct {
-	Bitcoin struct {
-		USD          float64 `json:"usd"`
-		USD24HChange float64 `json:"usd_24h_change"`
-	} `json:"bitcoin"`
-}
 
 type PersistentData struct {
 	LastPrice         float64
