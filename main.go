@@ -40,6 +40,7 @@ type PersistentData struct {
 	LastPrice         float64
 	LastChangePercent float64
 	LastUpdateTime    time.Time
+	ToTheMoonMode    bool
 }
 
 type BinanceResponse struct {
@@ -82,6 +83,7 @@ func main() {
 	lastPrice = data.LastPrice
 	lastChangePercent = data.LastChangePercent
 	lastUpdateTime = data.LastUpdateTime
+	toTheMoonMode = data.ToTheMoonMode
 
 	go priceUpdater()
 	systray.Run(onReady, onExit)
@@ -235,7 +237,7 @@ func updateTray(price, changePercent float64) {
 func updateTrayQuiet(price, changePercent float64) {
 	priceStr := formatPriceString(price, changePercent)
 	systray.SetTitle(priceStr)
-	systray.SetTooltip(priceStr)
+	// Tooltip is now set in formatPriceString
 }
 
 func formatPriceString(price, changePercent float64) string {
@@ -250,15 +252,17 @@ func formatPriceString(price, changePercent float64) string {
 	
 	var priceStr string
 	if toTheMoonMode {
-		millions := price / 1000
-		priceStr = fmt.Sprintf("%.3fM", millions/1000)
+		thousands := math.Floor(price / 1000) * 1000
+		millions := thousands / 1_000_000
+		priceStr = fmt.Sprintf("%.3fM", millions)
+		systray.SetTooltip(fmt.Sprintf("$%s", addThousandsSeparator(fmt.Sprintf("%.0f", math.Floor(price)))))
 	} else {
-		// Format with thousands separator using string manipulation
-		priceStr = addThousandsSeparator(fmt.Sprintf("%.2f", price))
+		priceStr = addThousandsSeparator(fmt.Sprintf("%.0f", math.Floor(price)))
+		systray.SetTooltip("")
 	}
 	
 	emoticons := getEmoticons(changePercent)
-	return fmt.Sprintf("₿ %s $%s (%+.2f%%) %s", emoji, priceStr, changePercent, emoticons)
+	return fmt.Sprintf("%s $%s (%+.2f%%) %s", emoji, priceStr, changePercent, emoticons)
 }
 
 func addThousandsSeparator(s string) string {
@@ -364,6 +368,7 @@ func savePersistentData() {
 		LastPrice:         lastPrice,
 		LastChangePercent: lastChangePercent,
 		LastUpdateTime:    lastUpdateTime,
+		ToTheMoonMode:    toTheMoonMode,
 	}
 
 	file, err := os.Create(getDataFilePath())
