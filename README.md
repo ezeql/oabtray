@@ -1,13 +1,15 @@
-# OAB Tray
+# 🚀🚀🚀 OAB Tray 🚀🚀🚀
 
 A system tray application that tracks and displays the current Bitcoin price in USD, with additional features for price change notifications and animations.
 
+![oabtray](image.png)
+
 ## Features
 
-- Real-time Bitcoin price tracking from Binance API
-- System tray display with price and percentage change
-- Price change animations for significant movements (≥5%)
-- "To the Moon" mode to display price in millions
+- 📈 Real-time Bitcoin price tracking from Binance API
+- 🖥️ System tray display with price and percentage change
+- 🎬 Price change animations for significant movements (≥5%)
+- 🚀 "To the Moon" mode to display price in millions
 
 ## Installation
 
