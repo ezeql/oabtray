@@ -2,7 +2,7 @@
 
 A system tray application that tracks and displays the current Bitcoin price in USD, with additional features for price change notifications and animations.
 
-![oabtray](image.png)
+![alt text](image-1.png)
 
 ## Features
 
