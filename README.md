@@ -9,7 +9,9 @@ A system tray application that tracks and displays the current Bitcoin price in 
 - 📈 Real-time Bitcoin price tracking from Binance API
 - 🖥️ System tray display with price and percentage change
 - 🎬 Price change animations for significant movements (≥5%)
-- 🚀 "To the Moon" mode to display price in millions
+- 🚀 "To the Mow-n" mode to display price in millions
+
+![To the Mow-n](image-1.png)
 
 ## Installation
 
