@@ -9,19 +9,20 @@ A system tray application that tracks and displays the current Bitcoin price in 
 - 📈 Real-time Bitcoin price tracking from Binance API
 - 🖥️ System tray display with price and percentage change
 - 🎬 Price change animations for significant movements (≥5%)
-- 🚀 "To the Mow-n" mode to display price in millions
-
-![To the Mow-n](image-1.png)
+- 🚀 "To the Mow-n" mode to display price in millions EX: $0.100M
 
 ## Installation
 
 1. Ensure Go is installed on your system
 2. Clone this repository
 3. Build the application:
+
    ```bash
    go build -o oabtray
    ```
+
 4. Run the executable:
+
    ```bash
    ./oabtray
    ```
@@ -39,7 +40,8 @@ A system tray application that tracks and displays the current Bitcoin price in 
 
 ## Configuration
 
-The application automatically saves its state to:
+The application automatically saves its state to
+
 - `~/bitcoin_tracker_data.gob` - Last known price and settings
 - `~/bitcoin_tracker.lock` - Lock file to prevent multiple instances
 
