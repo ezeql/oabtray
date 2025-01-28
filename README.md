@@ -1,5 +1,6 @@
 # 🚀🚀🚀 OAB Tray 🚀🚀🚀
 
+
 A system tray application that tracks and displays the current Bitcoin price in USD, with additional features for price change notifications and animations.
 
 ![alt text](image-1.png)
@@ -13,19 +14,22 @@ A system tray application that tracks and displays the current Bitcoin price in 
 
 ## Installation
 
-1. Ensure Go is installed on your system
-2. Clone this repository
-3. Build the application:
+1. Using Homebrew (macOS):
 
    ```bash
-   go build -o oabtray
+   # Install
+   brew tap ezeql/personal 
+   brew install oabtray
+
+   # Run
+   oabtray # Ctrl+C to exit
    ```
 
-4. Run the executable:
+2. Optional: To run OAB Tray automatically when your system starts:
 
-   ```bash
-   ./oabtray
-   ```
+    ```bash
+    brew services start oabtray
+    ```
 
 ## Usage
 
