@@ -223,9 +223,9 @@ func updateTray(price, changePercent float64) {
 	if math.Abs(changePercent) >= 5.0 {
 		var animationText string
 		if changePercent >= 5.0 {
-			animationText = "ALABADO!!!"
+			animationText = "TASTY!!!"
 		} else if changePercent <= -5.0 {
-			animationText = "PUTA MADRE!"
+			animationText = "BUY THE DIP!"
 		}
 		
 		if animationText != "" {
